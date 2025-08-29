@@ -115,12 +115,12 @@ func run(cfg *Config) {
 			continue
 		}
 
-		hierarchicalSubject, found := fileInfo.Fields["HierarchicalSubject"].([]interface{})
 		var bestSubject string
 
-		if found {
+		// First, try to get the HierarchicalSubject
+		if hierarchicalSubjects, found := fileInfo.Fields["HierarchicalSubject"].([]interface{}); found && len(hierarchicalSubjects) > 0 {
 			maxDepth := -1
-			for _, subject := range hierarchicalSubject {
+			for _, subject := range hierarchicalSubjects {
 				subjectStr, ok := subject.(string)
 				if !ok {
 					continue
@@ -130,6 +130,17 @@ func run(cfg *Config) {
 					maxDepth = currentDepth
 					bestSubject = subjectStr
 				}
+			}
+			if bestSubject != "" {
+				fmt.Printf("  Found HierarchicalSubject: %s\n", bestSubject)
+			}
+		}
+
+		// If HierarchicalSubject is not found or empty, try to get the regular Subject
+		if bestSubject == "" {
+			if subject, found := fileInfo.Fields["Subject"].(string); found && subject != "" {
+				bestSubject = subject
+				fmt.Printf("  No HierarchicalSubject found, falling back to Subject: %s\n", bestSubject)
 			}
 		}
 
@@ -151,7 +162,7 @@ func run(cfg *Config) {
 				continue
 			}
 
-			// Construct the new filename without curly braces
+			// Construct the new filename
 			newFileName := fmt.Sprintf("%s_%s.jpg", deepestCategory, hash)
 
 			fmt.Printf("  Found top-level category: '%s'\n", categoryDirName)
@@ -176,8 +187,8 @@ func run(cfg *Config) {
 				fmt.Printf("  (Dry Run) Would create directory '%s' and rename/move '%s' to '%s'\n", destinationDir, filePath, filepath.Join(destinationDir, newFileName))
 			}
 		} else {
-			// No hierarchical subject found
-			fmt.Println("  No Hierarchical Subject found. Moving to Uncategorized.")
+			// No hierarchical subject or subject found
+			fmt.Println("  No Hierarchical Subject or Subject found. Moving to Uncategorized.")
 			if !cfg.DryRun {
 				if err := moveFile(filePath, uncategorizedDir, ""); err != nil {
 					fmt.Fprintf(os.Stderr, "Error moving file: %v\n", err)
